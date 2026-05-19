@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { CheckCircle, Heart, Link, PlayCircleIcon } from 'lucide-react';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -15,8 +14,6 @@ import {
 } from '@/lib/db.client';
 import { SearchResult } from '@/lib/types';
 import { processImageUrl } from '@/lib/utils';
-
-import { ImagePlaceholder } from '@/components/ImagePlaceholder';
 
 interface VideoCardProps {
   id?: string;
@@ -57,7 +54,6 @@ export default function VideoCard({
 }: VideoCardProps) {
   const router = useRouter();
   const [favorited, setFavorited] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   const isAggregate = from === 'search' && !!items?.length;
 
@@ -132,7 +128,6 @@ export default function VideoCard({
     const unsubscribe = subscribeToDataUpdates(
       'favoritesUpdated',
       (newFavorites: Record<string, any>) => {
-        // 检查当前项目是否在新的收藏列表中
         const isNowFavorited = !!newFavorites[storageKey];
         setFavorited(isNowFavorited);
       }
@@ -148,11 +143,9 @@ export default function VideoCard({
       if (from === 'douban' || !actualSource || !actualId) return;
       try {
         if (favorited) {
-          // 如果已收藏，删除收藏
           await deleteFavorite(actualSource, actualId);
           setFavorited(false);
         } else {
-          // 如果未收藏，添加收藏
           await saveFavorite(actualSource, actualId, {
             title: actualTitle,
             source_name: source_name || '',
@@ -273,16 +266,14 @@ export default function VideoCard({
       onClick={handleClick}
     >
       {/* 海报容器 */}
-      <div className='relative aspect-[2/3] overflow-hidden rounded-lg'>
-        {/* 💡 終極修正：徹底閹割壞掉的骨架屏判定，強制所有海報不管三七二十一直接原圖輸出！ */}
-<Image
-  src={processImageUrl(actualPoster)}
-  alt={actualTitle}
-  fill
-  className='object-cover'
-  referrerPolicy='no-referrer'
-  priority={from === 'search' || from === 'douban'} // 讓首頁和搜尋頁的圖片擁有最高優先載入權
-/>
+      <div className='relative aspect-[2/3] overflow-hidden rounded-lg bg-neutral-800/50'>
+        {/* 💡 終極修正：徹底閹割 Next.js 壞掉的 Image 優化引擎，換回原始 img 標籤直出，秒刷海報！ */}
+        <img
+          src={processImageUrl(actualPoster)}
+          alt={actualTitle}
+          className='w-full h-full object-cover rounded-lg'
+          loading="eager"
+        />
 
         {/* 悬浮遮罩 */}
         <div className='absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 transition-opacity duration-300 ease-in-out group-hover:opacity-100' />
