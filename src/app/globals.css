@@ -174,3 +174,16 @@ div[data-media-provider] video {
     display: none !important;
   }
 }
+/* 💡 終極大結局：強行撕掉壞掉的前端遮罩，讓所有海報直接強制顯現！ */
+.opacity-0 {
+  opacity: 1 !important;
+}
+
+div[class*="group-hover:opacity-100"] {
+  opacity: 1 !important;
+}
+
+/* 確保包裹圖片的容器不會變成黑色一塊 */
+.bg-black\/5, .bg-neutral-900 {
+  background-color: transparent !important;
+}
