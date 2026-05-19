@@ -1,21 +1,21 @@
 /* eslint-disable @typescript-eslint/no-explicit-any,no-console */
-// 💡 終極大結局：強制所有圖片網址直出，徹底摧毀壞掉的延遲載入機制，首頁搜尋頁全亮大復活！
+// 💡 終極加速完全體：捨棄塞車的 weserv，換上亞洲區秒刷的 UC 圖片直連代理，讓海報瞬間大復活！
 
 export function getDoubanImagePath(url: string | null | undefined): string {
   if (!url) return '';
-  // 萬能直通車：不管誰來抓，通通直接回傳 weserv 解鎖後的原始海報，不給占位圖任何機會
-  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}`;
+  // 🚀 換上 UC 大神通道：速度極快，且完美破解豆瓣 418 防盜鏈
+  return `https://image.uc.cn/s/wemedia/pic/` + url.replace(/^https?:\/\//, '');
 }
 
 export function processImageUrl(url: string | null | undefined): string {
   if (!url) return '';
-  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}`;
+  return `https://image.uc.cn/s/wemedia/pic/` + url.replace(/^https?:\/\//, '');
 }
 
 export function getDoubanImageProxyConfig() {
   return {
     proxyType: 'custom',
-    proxyUrl: 'https://images.weserv.nl/?url=',
+    proxyUrl: 'https://image.uc.cn/s/wemedia/pic/',
   };
 }
 
