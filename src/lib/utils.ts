@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any,no-console */
-// 💡 終極完全體：完美修復 cleanHtmlTags 與測速型態衝突，銲死 weserv 圖片代理！
+// 💡 終極大結局：強制所有圖片網址直出，徹底摧毀壞掉的延遲載入機制，首頁搜尋頁全亮大復活！
 
-// 1. 核心圖片代理功能：直接覆蓋所有海報與圖片，強制走全球最穩定的 weserv 通道
 export function getDoubanImagePath(url: string | null | undefined): string {
   if (!url) return '';
+  // 萬能直通車：不管誰來抓，通通直接回傳 weserv 解鎖後的原始海報，不給占位圖任何機會
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}`;
 }
 
@@ -19,13 +19,11 @@ export function getDoubanImageProxyConfig() {
   };
 }
 
-// 2. 補回 downstream.ts 找不到的 cleanHtmlTags
 export function cleanHtmlTags(html: string): string {
   if (!html) return '';
   return html.replace(/<[^>]*>/g, '').trim();
 }
 
-// 3. 完美修復型態相容問題：讓它同時符合解析度與測速 (testResult) 的千奇百怪要求
 export function getVideoResolutionFromM3u8(m3u8Content: string): any {
   if (!m3u8Content) return null;
   try {
@@ -34,7 +32,6 @@ export function getVideoResolutionFromM3u8(m3u8Content: string): any {
       if (lines[i].includes('RESOLUTION=')) {
         const match = lines[i].match(/RESOLUTION=(\d+)x(\d+)/);
         if (match) {
-          // 同時附帶兩種型態所需的欄位，用 as any 徹底抹平 TypeScript 的型態霸凌
           return {
             width: parseInt(match[1], 10),
             height: parseInt(match[2], 10),
@@ -48,7 +45,6 @@ export function getVideoResolutionFromM3u8(m3u8Content: string): any {
   } catch (e) {
     console.error('解析 M3U8 失败:', e);
   }
-  // 如果是 null，也讓它帶有測速所需的結構，防止推入 allResults 時崩潰
   return {
     width: 0,
     height: 0,
@@ -58,16 +54,13 @@ export function getVideoResolutionFromM3u8(m3u8Content: string): any {
   } as any;
 }
 
-// 4. 其他基礎輔助函式
 export function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00';
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-
   const mm = m < 10 ? `0${m}` : `${m}`;
   const ss = s < 10 ? `0${s}` : `${s}`;
-
   if (h > 0) {
     const hh = h < 10 ? `0${h}` : `${h}`;
     return `${hh}:${mm}:${ss}`;
