@@ -174,16 +174,27 @@ div[data-media-provider] video {
     display: none !important;
   }
 }
-/* 💡 終極大結局：強行撕掉壞掉的前端遮罩，讓所有海報直接強制顯現！ */
-.opacity-0 {
+/* 💡 終極大結局：強行引爆所有前端卡片的隱藏狀態，逼迫所有海報直接原形畢露！ */
+
+/* 1. 強制所有可能被隱藏的圖片容器直接 100% 顯現 */
+.opacity-0, 
+[class*="opacity-0"],
+[class*="group-hover:opacity-100"] {
   opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
 }
 
-div[class*="group-hover:opacity-100"] {
-  opacity: 1 !important;
-}
-
-/* 確保包裹圖片的容器不會變成黑色一塊 */
-.bg-black\/5, .bg-neutral-900 {
+/* 2. 徹底摧毀黑色遮罩，不准它擋在海報前面 */
+.bg-black\/5, 
+.bg-neutral-900,
+[class*="bg-black"],
+[class*="bg-neutral"] {
   background-color: transparent !important;
+}
+
+/* 3. 強制所有縮放與動畫直接切換到「滑鼠移入」後的完全體狀態，逼迫 Lazy Load 醒過來 */
+[class*="scale-0"],
+[class*="group-hover:scale-100"] {
+  transform: scale(1) !important;
 }
