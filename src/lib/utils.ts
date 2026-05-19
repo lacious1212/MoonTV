@@ -1,14 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any,no-console */
-import he from 'he';
-import { Hls } from 'hls.js';
+// 💡 終極無毒版：直接拔掉 he 和 hls.js 的頂層 import，用最底層寫法繞過 Vercel 報錯！
 
-// 💡 暴力銲死：不管前端怎麼判定，所有的圖片網址一律強制走最穩定的 weserv 轉發服務！
 export function getDoubanImagePath(url: string | null | undefined): string {
   if (!url) return '';
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}`;
 }
 
-// 為了不讓專案其他地方報錯，保留原本的函式結構，但內部全部轉向 weserv
 export function getDoubanImageProxyConfig() {
   return {
     proxyType: 'custom',
@@ -34,14 +31,23 @@ export function formatTime(seconds: number): string {
 
 export function cleanHtml(html: string): string {
   if (!html) return '';
+  // 不使用 he 套件，改用純正則表達式把標籤擦乾淨
   let text = html.replace(/<[^>]*>/g, '');
-  text = he.decode(text);
+  // 簡易手動取代常見的 HTML 實體符號，完全避開外部套件依賴
+  text = text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
   return text.trim();
 }
 
 export function isHlsSupported(): boolean {
   if (typeof window === 'undefined') return false;
-  return Hls.isSupported() || !!document.createElement('video').canPlayType('application/vnd.apple.mpegurl');
+  // 避開頂層 import，改用 window 動態檢查或 Hls 核心判斷
+  const globalHls = (window as any).Hls;
+  return !!(globalHls?.isSupported() || document.createElement('video').canPlayType('application/vnd.apple.mpegurl'));
 }
 
 export function getErrorMessage(error: any): string {
