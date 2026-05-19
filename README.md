@@ -257,7 +257,7 @@ MoonTV 支持标准的苹果 CMS V10 API 格式。
 设置环境变量 USERNAME 和 PASSWORD 即为站长用户，站长可设置用户为管理员
 
 站长或管理员访问 `/admin` 即可进行管理员配置
-
+ 
 ## AndroidTV 使用
 
 目前该项目可以配合 [OrionTV](https://github.com/zimplexing/OrionTV) 在 Android TV 上使用，可以直接作为 OrionTV 后端
