@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any,no-console */
-// 💡 終極無毒版：直接拔掉 he 和 hls.js 的頂層 import，用最底層寫法繞過 Vercel 報錯！
+// 💡 終極完全體：補回專案所需的 getVideoResolutionFromM3u8 與 processImageUrl，同時徹底銲死 weserv 圖片代理！
 
+// 1. 核心圖片代理功能：直接覆蓋所有海報與圖片，強制走全球最穩定的 weserv 通道復活
 export function getDoubanImagePath(url: string | null | undefined): string {
+  if (!url) return '';
+  return `https://images.weserv.nl/?url=${encodeURIComponent(url)}`;
+}
+
+export function processImageUrl(url: string | null | undefined): string {
   if (!url) return '';
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}`;
 }
@@ -13,6 +19,29 @@ export function getDoubanImageProxyConfig() {
   };
 }
 
+// 2. 補回播放頁 (play/page.tsx) 缺失的 M3U8 解析度處理函式，確保 Webpack 順利通過
+export function getVideoResolutionFromM3u8(m3u8Content: string): { width: number; height: number } | null {
+  if (!m3u8Content) return null;
+  try {
+    const lines = m3u8Content.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('RESOLUTION=')) {
+        const match = lines[i].match(/RESOLUTION=(\d+)x(\d+)/);
+        if (match) {
+          return {
+            width: parseInt(match[1], 10),
+            height: parseInt(match[2], 10)
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.error('解析 M3U8 分辨率失败:', e);
+  }
+  return null;
+}
+
+// 3. 其他專案基礎輔助函式
 export function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '00:00';
   const h = Math.floor(seconds / 3600);
@@ -31,9 +60,7 @@ export function formatTime(seconds: number): string {
 
 export function cleanHtml(html: string): string {
   if (!html) return '';
-  // 不使用 he 套件，改用純正則表達式把標籤擦乾淨
   let text = html.replace(/<[^>]*>/g, '');
-  // 簡易手動取代常見的 HTML 實體符號，完全避開外部套件依賴
   text = text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
@@ -45,7 +72,6 @@ export function cleanHtml(html: string): string {
 
 export function isHlsSupported(): boolean {
   if (typeof window === 'undefined') return false;
-  // 避開頂層 import，改用 window 動態檢查或 Hls 核心判斷
   const globalHls = (window as any).Hls;
   return !!(globalHls?.isSupported() || document.createElement('video').canPlayType('application/vnd.apple.mpegurl'));
 }
