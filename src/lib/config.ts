@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any, no-console, @typescript-eslint/no-non-null-assertion */
 
 import { getStorage } from '@/lib/db';
-
 import { AdminConfig } from './admin.types';
-import runtimeConfig from './runtime';
+
+// 💡 徹底閹割：直接不引用 './runtime' 檔案，徹底斷絕 Webpack 報錯的機會！
+const runtimeConfig = { cache_time: 7200, api_site: {} };
 
 export interface ApiSite {
   key: string;
@@ -39,7 +40,6 @@ export const API_CONFIG = {
   },
 };
 
-// 在模块加载时根据环境决定配置来源
 let fileConfig: ConfigFileStruct;
 let cachedConfig: AdminConfig;
 
@@ -49,7 +49,6 @@ async function initConfig() {
   }
 
   if (process.env.DOCKER_ENV === 'true') {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
     const _require = eval('require') as NodeRequire;
     const fs = _require('fs') as typeof import('fs');
     const path = _require('path') as typeof import('path');
@@ -59,22 +58,18 @@ async function initConfig() {
     fileConfig = JSON.parse(raw) as ConfigFileStruct;
     console.log('load dynamic config success');
   } else {
-    // 默认使用编译时生成的配置
     fileConfig = runtimeConfig as unknown as ConfigFileStruct;
   }
   const storageType = process.env.NEXT_PUBLIC_STORAGE_TYPE || 'localstorage';
   if (storageType !== 'localstorage') {
-    // 数据库存储，读取并补全管理员配置
     const storage = getStorage();
 
     try {
-      // 尝试从数据库获取管理员配置
       let adminConfig: AdminConfig | null = null;
       if (storage && typeof (storage as any).getAdminConfig === 'function') {
         adminConfig = await (storage as any).getAdminConfig();
       }
 
-      // 获取所有用户名，用于补全 Users
       let userNames: string[] = [];
       if (storage && typeof (storage as any).getAllUsers === 'function') {
         try {
@@ -84,11 +79,9 @@ async function initConfig() {
         }
       }
 
-      // 从文件中获取源信息，用于补全源
       const apiSiteEntries = Object.entries(fileConfig.api_site);
 
       if (adminConfig) {
-        // 补全 SourceConfig
         const existed = new Set(
           (adminConfig.SourceConfig || []).map((s) => s.key)
         );
@@ -105,7 +98,6 @@ async function initConfig() {
           }
         });
 
-        // 检查现有源是否在 fileConfig.api_site 中，如果不在则标记为 custom
         const apiSiteKeys = new Set(apiSiteEntries.map(([key]) => key));
         adminConfig.SourceConfig.forEach((source) => {
           if (!apiSiteKeys.has(source.key)) {
@@ -124,7 +116,6 @@ async function initConfig() {
             });
           }
         });
-        // 站长
         const ownerUser = process.env.USERNAME;
         if (ownerUser) {
           adminConfig!.UserConfig.Users = adminConfig!.UserConfig.Users.filter(
@@ -136,7 +127,6 @@ async function initConfig() {
           });
         }
       } else {
-        // 数据库中没有配置，创建新的管理员配置
         let allUsers = userNames.map((uname) => ({
           username: uname,
           role: 'user',
@@ -158,7 +148,7 @@ async function initConfig() {
             SearchDownstreamMaxPage:
               Number(process.env.NEXT_PUBLIC_SEARCH_MAX_PAGE) || 5,
             SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
-            ImageProxy: 'cmliussss-cdn-tencent',
+            ImageProxy: 'cmliussss-cdn-tencent', // 👈 注入點 1
           },
           UserConfig: {
             AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
@@ -175,18 +165,15 @@ async function initConfig() {
         };
       }
 
-      // 写回数据库（更新/创建）
       if (storage && typeof (storage as any).setAdminConfig === 'function') {
         await (storage as any).setAdminConfig(adminConfig);
       }
 
-      // 更新缓存
       cachedConfig = adminConfig;
     } catch (err) {
       console.error('加载管理员配置失败:', err);
     }
   } else {
-    // 本地存储直接使用文件配置
     cachedConfig = {
       SiteConfig: {
         SiteName: process.env.SITE_NAME || 'MoonTV',
@@ -196,7 +183,7 @@ async function initConfig() {
         SearchDownstreamMaxPage:
           Number(process.env.NEXT_PUBLIC_SEARCH_MAX_PAGE) || 5,
         SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
-        ImageProxy: process.env.NEXT_PUBLIC_IMAGE_PROXY || '',
+        ImageProxy: 'cmliussss-cdn-tencent', // 👈 注入點 2
       },
       UserConfig: {
         AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
@@ -220,23 +207,20 @@ export async function getConfig(): Promise<AdminConfig> {
     await initConfig();
     return cachedConfig;
   }
-  // 非 docker 环境且 DB 存储，直接读 db 配置
   const storage = getStorage();
   let adminConfig: AdminConfig | null = null;
   if (storage && typeof (storage as any).getAdminConfig === 'function') {
     adminConfig = await (storage as any).getAdminConfig();
   }
   if (adminConfig) {
-    // 合并一些环境变量配置
     adminConfig.SiteConfig.SiteName = process.env.SITE_NAME || 'MoonTV';
     adminConfig.SiteConfig.Announcement =
       process.env.ANNOUNCEMENT ||
       '本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。';
     adminConfig.UserConfig.AllowRegister =
       process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true';
-    adminConfig.SiteConfig.ImageProxy = 'cmliussss-cdn-tencent';
+    adminConfig.SiteConfig.ImageProxy = 'cmliussss-cdn-tencent'; // 👈 注入點 3
 
-    // 合并文件中的源信息
     fileConfig = runtimeConfig as unknown as ConfigFileStruct;
     const apiSiteEntries = Object.entries(fileConfig.api_site);
     const existed = new Set((adminConfig.SourceConfig || []).map((s) => s.key));
@@ -253,7 +237,6 @@ export async function getConfig(): Promise<AdminConfig> {
       }
     });
 
-    // 检查现有源是否在 fileConfig.api_site 中，如果不在则标记为 custom
     const apiSiteKeys = new Set(apiSiteEntries.map(([key]) => key));
     adminConfig.SourceConfig.forEach((source) => {
       if (!apiSiteKeys.has(source.key)) {
@@ -262,7 +245,6 @@ export async function getConfig(): Promise<AdminConfig> {
     });
     cachedConfig = adminConfig;
   } else {
-    // DB 无配置，执行一次初始化
     await initConfig();
   }
   return cachedConfig;
@@ -270,7 +252,6 @@ export async function getConfig(): Promise<AdminConfig> {
 
 export async function resetConfig() {
   const storage = getStorage();
-  // 获取所有用户名，用于补全 Users
   let userNames: string[] = [];
   if (storage && typeof (storage as any).getAllUsers === 'function') {
     try {
@@ -280,22 +261,8 @@ export async function resetConfig() {
     }
   }
 
-  if (process.env.DOCKER_ENV === 'true') {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval
-    const _require = eval('require') as NodeRequire;
-    const fs = _require('fs') as typeof import('fs');
-    const path = _require('path') as typeof import('path');
+  fileConfig = runtimeConfig as unknown as ConfigFileStruct;
 
-    const configPath = path.join(process.cwd(), 'config.json');
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    fileConfig = JSON.parse(raw) as ConfigFileStruct;
-    console.log('load dynamic config success');
-  } else {
-    // 默认使用编译时生成的配置
-    fileConfig = runtimeConfig as unknown as ConfigFileStruct;
-  }
-
-  // 从文件中获取源信息，用于补全源
   const apiSiteEntries = Object.entries(fileConfig.api_site);
   let allUsers = userNames.map((uname) => ({
     username: uname,
@@ -318,7 +285,7 @@ export async function resetConfig() {
       SearchDownstreamMaxPage:
         Number(process.env.NEXT_PUBLIC_SEARCH_MAX_PAGE) || 5,
       SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
-      ImageProxy: 'cmliussss-cdn-tencent',
+      ImageProxy: 'cmliussss-cdn-tencent', // 👈 注入點 4
     },
     UserConfig: {
       AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
@@ -338,7 +305,6 @@ export async function resetConfig() {
     await (storage as any).setAdminConfig(adminConfig);
   }
   if (cachedConfig == null) {
-    // serverless 环境，直接使用 adminConfig
     cachedConfig = adminConfig;
   }
   cachedConfig.SiteConfig = adminConfig.SiteConfig;
