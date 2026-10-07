@@ -3,8 +3,36 @@
 import { getStorage } from '@/lib/db';
 import { AdminConfig } from './admin.types';
 
-// 💡 徹底閹割：直接不引用 './runtime' 檔案，徹底斷絕 Webpack 報錯的機會！
-const runtimeConfig = { cache_time: 7200, api_site: {} };
+// 配置穩定的開源影視採集站點
+const runtimeConfig = {
+  cache_time: 7200,
+  api_site: {
+    ffm3u8: {
+      key: 'ffm3u8',
+      api: 'https://cj.ffzyapi.com/api.php/provide/vod/',
+      name: '非凡資源',
+      detail: 'https://cj.ffzyapi.com/api.php/provide/vod/',
+    },
+    lzm3u8: {
+      key: 'lzm3u8',
+      api: 'https://cj.lziapi.com/api.php/provide/vod/',
+      name: '量子資源',
+      detail: 'https://cj.lziapi.com/api.php/provide/vod/',
+    },
+    mdm3u8: {
+      key: 'mdm3u8',
+      api: 'https://caiji.moduapi.cc/api.php/provide/vod/',
+      name: '魔都資源',
+      detail: 'https://caiji.moduapi.cc/api.php/provide/vod/',
+    },
+    snm3u8: {
+      key: 'snm3u8',
+      api: 'https://suoniapi.com/api.php/provide/vod/',
+      name: '索尼資源',
+      detail: 'https://suoniapi.com/api.php/provide/vod/',
+    },
+  },
+};
 
 export interface ApiSite {
   key: string;
@@ -148,7 +176,7 @@ async function initConfig() {
             SearchDownstreamMaxPage:
               Number(process.env.NEXT_PUBLIC_SEARCH_MAX_PAGE) || 5,
             SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
-            ImageProxy: 'cmliussss-cdn-tencent', // 👈 注入點 1
+            ImageProxy: 'cmliussss-cdn-tencent',
           },
           UserConfig: {
             AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
@@ -183,7 +211,7 @@ async function initConfig() {
         SearchDownstreamMaxPage:
           Number(process.env.NEXT_PUBLIC_SEARCH_MAX_PAGE) || 5,
         SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
-        ImageProxy: 'cmliussss-cdn-tencent', // 👈 注入點 2
+        ImageProxy: 'cmliussss-cdn-tencent',
       },
       UserConfig: {
         AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
@@ -219,7 +247,7 @@ export async function getConfig(): Promise<AdminConfig> {
       '本网站仅提供影视信息搜索服务，所有内容均来自第三方网站。本站不存储任何视频资源，不对任何内容的准确性、合法性、完整性负责。';
     adminConfig.UserConfig.AllowRegister =
       process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true';
-    adminConfig.SiteConfig.ImageProxy = 'cmliussss-cdn-tencent'; // 👈 注入點 3
+    adminConfig.SiteConfig.ImageProxy = 'cmliussss-cdn-tencent';
 
     fileConfig = runtimeConfig as unknown as ConfigFileStruct;
     const apiSiteEntries = Object.entries(fileConfig.api_site);
@@ -285,7 +313,7 @@ export async function resetConfig() {
       SearchDownstreamMaxPage:
         Number(process.env.NEXT_PUBLIC_SEARCH_MAX_PAGE) || 5,
       SiteInterfaceCacheTime: fileConfig.cache_time || 7200,
-      ImageProxy: 'cmliussss-cdn-tencent', // 👈 注入點 4
+      ImageProxy: 'cmliussss-cdn-tencent',
     },
     UserConfig: {
       AllowRegister: process.env.NEXT_PUBLIC_ENABLE_REGISTER === 'true',
