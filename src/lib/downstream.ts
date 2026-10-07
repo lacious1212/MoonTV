@@ -17,7 +17,10 @@ interface ApiSearchItem {
 
 function formatPosterUrl(url?: string): string {
   if (!url) return '';
-  return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
+  return url.replace(
+    /https?:\/\/[a-z0-9]+\.doubanio\.com/g,
+    'https://douban-proxy.ludaoxous.workers.dev'
+  );
 }
 
 function parseM3u8Links(rawPlayUrl?: string): string[] {
@@ -44,44 +47,65 @@ export async function searchFromApi(
 ): Promise<SearchResult[]> {
   try {
     const apiBaseUrl = apiSite.api;
-    const apiUrl =
-      apiBaseUrl + API_CONFIG.search.path + encodeURIComponent(query);
-    const apiName = apiSite.name;
+    const encodedQuery = encodeURIComponent(query.trim());
+    
+    // 優先使用 detail 模式，若失敗則回退到標準 wd 模式
+    const detailUrl = `${apiBaseUrl}?ac=detail&wd=${encodedQuery}`;
+    const simpleUrl = `${apiBaseUrl}?wd=${encodedQuery}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const response = await fetch(apiUrl, {
+    let response = await fetch(detailUrl, {
       headers: API_CONFIG.search.headers,
       signal: controller.signal,
     });
 
+    let data = response.ok ? await response.json() : null;
+
+    // 如果帶 ac=detail 沒搜到，嘗試純 wd 查詢
+    if (!data?.list || !Array.isArray(data.list) || data.list.length === 0) {
+      response = await fetch(simpleUrl, {
+        headers: API_CONFIG.search.headers,
+        signal: controller.signal,
+      });
+      data = response.ok ? await response.json() : null;
+    }
+
     clearTimeout(timeoutId);
 
-    if (!response.ok) {
+    if (!data?.list || !Array.isArray(data.list) || data.list.length === 0) {
       return [];
     }
 
-    const data = await response.json();
-    if (
-      !data ||
-      !data.list ||
-      !Array.isArray(data.list) ||
-      data.list.length === 0
-    ) {
-      return [];
-    }
+    // 處理搜尋結果
+    const results: SearchResult[] = [];
+    for (const item of data.list as ApiSearchItem[]) {
+      let episodes = parseM3u8Links(item.vod_play_url);
 
-    return data.list.map((item: ApiSearchItem) => {
-      const episodes = parseM3u8Links(item.vod_play_url);
+      // 如果當前只有基本資訊沒有播放列表，嘗試補抓一次詳情
+      if (episodes.length === 0 && item.vod_id) {
+        try {
+          const detailRes = await fetch(`${apiBaseUrl}?ac=detail&ids=${item.vod_id}`);
+          if (detailRes.ok) {
+            const detailJson = await detailRes.json();
+            const detailItem = detailJson?.list?.[0];
+            if (detailItem?.vod_play_url) {
+              episodes = parseM3u8Links(detailItem.vod_play_url);
+            }
+          }
+        } catch (_) {
+          // ignore
+        }
+      }
 
-      return {
+      results.push({
         id: item.vod_id.toString(),
         title: item.vod_name.trim().replace(/\s+/g, ' '),
         poster: formatPosterUrl(item.vod_pic),
         episodes,
         source: apiSite.key,
-        source_name: apiName,
+        source_name: apiSite.name,
         class: item.vod_class,
         year: item.vod_year
           ? item.vod_year.match(/\d{4}/)?.[0] || ''
@@ -89,8 +113,10 @@ export async function searchFromApi(
         desc: cleanHtmlTags(item.vod_content || ''),
         type_name: item.type_name,
         douban_id: item.vod_douban_id,
-      };
-    });
+      });
+    }
+
+    return results;
   } catch (error) {
     return [];
   }
@@ -100,7 +126,7 @@ export async function getDetailFromApi(
   apiSite: ApiSite,
   id: string
 ): Promise<SearchResult> {
-  const detailUrl = `${apiSite.api}${API_CONFIG.detail.path}${id}`;
+  const detailUrl = `${apiSite.api}?ac=detail&ids=${id}`;
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
