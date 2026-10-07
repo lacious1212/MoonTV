@@ -3,136 +3,108 @@ import { NextResponse } from 'next/server';
 import { getCacheTime } from '@/lib/config';
 import { DoubanItem, DoubanResult } from '@/lib/types';
 
-interface DoubanCategoryApiResponse {
-  total: number;
-  items: Array<{
-    id: string;
-    title: string;
-    card_subtitle: string;
-    pic: {
-      large: string;
-      normal: string;
-    };
-    rating: {
-      value: number;
-    };
-  }>;
-}
-
-async function fetchDoubanData(
-  url: string
-): Promise<DoubanCategoryApiResponse> {
-  // 添加超时控制
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
-
-  // 设置请求选项，包括信号和头部
-  const fetchOptions = {
-    signal: controller.signal,
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-      Referer: 'https://movie.douban.com/',
-      Accept: 'application/json, text/plain, */*',
-      Origin: 'https://movie.douban.com',
-    },
-  };
-
-  try {
-    // 尝试直接访问豆瓣API
-    const response = await fetch(url, fetchOptions);
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-}
-
 export const runtime = 'edge';
+
+function formatDoubanImageUrl(url?: string): string {
+  if (!url) return '';
+  return url.replace(
+    /https?:\/\/[a-z0-9]+\.doubanio\.com/g,
+    'https://douban-proxy.ludaoxous.workers.dev'
+  );
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
-  // 获取参数
   const kind = searchParams.get('kind') || 'movie';
-  const category = searchParams.get('category');
-  const type = searchParams.get('type');
-  const pageLimit = parseInt(searchParams.get('limit') || '20');
-  const pageStart = parseInt(searchParams.get('start') || '0');
+  const type = searchParams.get('type') || '';
+  const genres = searchParams.get('genres') || '';
+  const year = searchParams.get('year') || '';
+  const limit = parseInt(searchParams.get('limit') || '25');
+  const start = parseInt(searchParams.get('start') || '0');
 
-  // 验证参数
-  if (!kind || !category || !type) {
-    return NextResponse.json(
-      { error: '缺少必要参数: kind 或 category 或 type' },
-      { status: 400 }
-    );
+  // 對應地區標籤
+  const regionMap: Record<string, string> = {
+    tv_domestic: '华语',
+    tv_american: '欧美',
+    tv_japanese: '日本',
+    tv_korean: '韩国',
+    tv_animation: '动画',
+    tv_documentary: '纪录片',
+    show_domestic: '国内',
+    show_foreign: '国外',
+  };
+
+  const tags: string[] = [];
+  if (kind === 'tv') tags.push('电视剧');
+  if (kind === 'movie') tags.push('电影');
+
+  if (regionMap[type]) {
+    tags.push(regionMap[type]);
+  } else if (type && !['tv', 'show', '全部'].includes(type)) {
+    tags.push(type);
   }
 
-  if (!['tv', 'movie'].includes(kind)) {
-    return NextResponse.json(
-      { error: 'kind 参数必须是 tv 或 movie' },
-      { status: 400 }
-    );
+  if (genres && genres !== '全部') {
+    tags.push(genres);
   }
 
-  if (pageLimit < 1 || pageLimit > 100) {
-    return NextResponse.json(
-      { error: 'pageSize 必须在 1-100 之间' },
-      { status: 400 }
-    );
+  // 年份區間處理
+  let yearRange = '';
+  if (year && year !== '全部') {
+    if (year === '2020年代') yearRange = '2020,2029';
+    else if (year === '2010年代') yearRange = '2010,2019';
+    else if (year === '更早') yearRange = '1900,2009';
+    else yearRange = `${year},${year}`;
   }
 
-  if (pageStart < 0) {
-    return NextResponse.json(
-      { error: 'pageStart 不能小于 0' },
-      { status: 400 }
-    );
-  }
+  const tagQuery = encodeURIComponent(tags.join(','));
+  let target = `https://movie.douban.com/j/new_search_subjects?sort=U&range=0,10&tags=${tagQuery}&start=${start}&limit=${limit}`;
 
-  const target = `https://m.douban.com/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`;
+  if (yearRange) {
+    target += `&year_range=${encodeURIComponent(yearRange)}`;
+  }
 
   try {
-    // 调用豆瓣 API
-    const doubanData = await fetchDoubanData(target);
-
-    // 转换数据格式并直接接入 Cloudflare Worker 代理
-    const list: DoubanItem[] = doubanData.items.map((item) => {
-      const rawPoster = item.pic?.normal || item.pic?.large || '';
-      const proxiedPoster = rawPoster.replace(
-        /https?:\/\/[a-z0-9]+\.doubanio\.com/g,
-        'https://douban-proxy.ludaoxous.workers.dev'
-      );
-
-      return {
-        id: item.id,
-        title: item.title,
-        poster: proxiedPoster,
-        rate: item.rating?.value ? item.rating.value.toFixed(1) : '',
-        year: item.card_subtitle?.match(/(\d{4})/)?.[1] || '',
-      };
+    const response = await fetch(target, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        Referer: 'https://movie.douban.com/explore',
+        Accept: 'application/json, text/plain, */*',
+      },
     });
 
-    const response: DoubanResult = {
+    if (!response.ok) {
+      throw new Error(`豆瓣接口请求失败: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const rawList = data.data || [];
+
+    const list: DoubanItem[] = rawList.map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      poster: formatDoubanImageUrl(item.cover),
+      rate: item.rate || '',
+      year: item.year || '',
+    }));
+
+    const result: DoubanResult = {
       code: 200,
       message: '获取成功',
-      list: list,
+      list,
     };
 
     const cacheTime = await getCacheTime();
-    return NextResponse.json(response, {
+    return NextResponse.json(result, {
       headers: {
         'Cache-Control': `public, max-age=${cacheTime}`,
       },
     });
   } catch (error) {
     return NextResponse.json(
-      { error: '获取豆瓣数据失败', details: (error as Error).message },
+      { error: '获取分类数据失败', details: (error as Error).message },
       { status: 500 }
     );
   }
