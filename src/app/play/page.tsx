@@ -74,7 +74,6 @@ function PlayPageClient() {
 
   // 搜索所需信息
   const [searchTitle] = useState(searchParams.get('stitle') || '');
-  const [searchType] = useState(searchParams.get('stype') || '');
 
   // 是否需要优选
   const [needPrefer, setNeedPrefer] = useState(
@@ -176,7 +175,6 @@ function PlayPageClient() {
   ): Promise<SearchResult> => {
     if (sources.length === 1) return sources[0];
 
-    // 将播放源均分为两批，并发测速各批，避免一次性过多请求
     const batchSize = Math.ceil(sources.length / 2);
     const allResults: Array<{
       source: SearchResult;
@@ -188,9 +186,7 @@ function PlayPageClient() {
       const batchResults = await Promise.all(
         batchSources.map(async (source) => {
           try {
-            // 检查是否有第一集的播放地址
             if (!source.episodes || source.episodes.length === 0) {
-              console.warn(`播放源 ${source.source_name} 没有可用的播放地址`);
               return null;
             }
 
@@ -238,7 +234,6 @@ function PlayPageClient() {
     setPrecomputedVideoInfo(newVideoInfoMap);
 
     if (successfulResults.length === 0) {
-      console.warn('所有播放源测速都失败，使用第一个播放源');
       return sources[0];
     }
 
@@ -438,7 +433,6 @@ function PlayPageClient() {
         setAvailableSources([detailData]);
         return [detailData];
       } catch (err) {
-        console.error('获取视频详情失败:', err);
         return [];
       } finally {
         setSourceSearchLoading(false);
@@ -460,28 +454,24 @@ function PlayPageClient() {
           .replaceAll(' ', '')
           .toLowerCase();
 
-        // 1. 精準比對
-        const exactMatches = searchList.filter((result: SearchResult) => {
+        // 徹底解除年份與片型限制，只要片名有包含即判定命中！
+        const finalResults = searchList.filter((result: SearchResult) => {
           const itemTitle = result.title.replaceAll(' ', '').toLowerCase();
-          return itemTitle === targetTitle && (result.episodes?.length || 0) > 0;
+          const isMatch =
+            itemTitle === targetTitle ||
+            itemTitle.includes(targetTitle) ||
+            targetTitle.includes(itemTitle);
+          return isMatch && (result.episodes?.length || 0) > 0;
         });
 
-        // 2. 寬鬆模糊比對（容許片名帶標籤或後綴）
-        const fuzzyMatches = searchList.filter((result: SearchResult) => {
-          const itemTitle = result.title.replaceAll(' ', '').toLowerCase();
-          const isRelated =
-            itemTitle.includes(targetTitle) || targetTitle.includes(itemTitle);
-          return isRelated && (result.episodes?.length || 0) > 0;
-        });
-
-        const combined = exactMatches.length > 0 ? exactMatches : fuzzyMatches;
-        const finalResults =
-          combined.length > 0
-            ? combined
+        // 備援：若過濾後為空，直接採用包含集數的搜尋結果
+        const validList =
+          finalResults.length > 0
+            ? finalResults
             : searchList.filter((r) => (r.episodes?.length || 0) > 0);
 
-        setAvailableSources(finalResults);
-        return finalResults;
+        setAvailableSources(validList);
+        return validList;
       } catch (err) {
         setSourceSearchError(err instanceof Error ? err.message : '搜索失败');
         setAvailableSources([]);
@@ -1000,7 +990,6 @@ function PlayPageClient() {
         customType: {
           m3u8: function (video: HTMLVideoElement, url: string) {
             if (!Hls) {
-              console.error('HLS.js 未加载');
               return;
             }
 
@@ -1026,7 +1015,6 @@ function PlayPageClient() {
             ensureVideoSource(video, url);
 
             hls.on(Hls.Events.ERROR, function (event: any, data: any) {
-              console.error('HLS Error:', event, data);
               if (data.fatal) {
                 switch (data.type) {
                   case Hls.ErrorTypes.NETWORK_ERROR:
@@ -1124,7 +1112,6 @@ function PlayPageClient() {
       });
 
       artPlayerRef.current.on('error', (err: any) => {
-        console.error('播放器错误:', err);
         if (artPlayerRef.current.currentTime > 0) {
           return;
         }
@@ -1166,7 +1153,6 @@ function PlayPageClient() {
         );
       }
     } catch (err) {
-      console.error('创建播放器失败:', err);
       setError('播放器初始化失败');
     }
   }, [Artplayer, Hls, videoUrl, loading, blockAdEnabled]);
