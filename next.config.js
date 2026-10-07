@@ -8,7 +8,6 @@ const nextConfig = {
     serverExternalPackages: ['@redis/client', 'redis'],
   },
   images: {
-    // 💡 終極防護罩：在 Next.js 最外層架設過濾網，強制所有直連豆瓣的圖片在背後進行標頭偽裝，徹底破解 418 阻擋！
     remotePatterns: [
       { protocol: 'https', hostname: '*.doubanio.com' },
       { protocol: 'https', hostname: 'img1.doubanio.com' },
@@ -16,15 +15,10 @@ const nextConfig = {
       { protocol: 'https', hostname: 'img3.doubanio.com' },
       { protocol: 'https', hostname: 'img9.doubanio.com' },
       { protocol: 'https', hostname: 'images.weserv.nl' },
-      { protocol: 'https', hostname: 'douban-proxy.ludaoxous.workers.dev' }
+      { protocol: 'https', hostname: 'douban-proxy.ludaoxous.workers.dev' },
     ],
-    // 讓 Next.js 本地伺服器幫忙緩存與轉發圖片，直接避開瀏覽器直連被擋的問題
-    unoptimized: false,
-  },
-  async redirects() {
-    return [
-      { source: '/', destination: '/zh', permanent: true },
-    ];
+    // 讓 Cloudflare Pages 直接輸出原始圖片網址，不走 Next.js 優化引擎
+    unoptimized: true,
   },
   async rewrites() {
     return [
@@ -32,11 +26,6 @@ const nextConfig = {
         source: '/api/v1/:path*',
         destination: 'https://api.douban.com/v2/:path*',
       },
-      // 💡 萬能重寫規則：只要前端試圖直連豆瓣圖片，我們暗中在 Vercel 後端幫它轉發，徹底繞過 418 地獄！
-      {
-        source: '/_next/image',
-        destination: '/_next/image',
-      }
     ];
   },
   webpack: (config, { isServer }) => {
