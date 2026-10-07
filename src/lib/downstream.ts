@@ -20,6 +20,31 @@ function formatPosterUrl(url?: string): string {
   return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
 }
 
+// 萬能解析 m3u8 連結函式（相容 $、# 或純 URL）
+function parseM3u8Links(rawPlayUrl?: string): string[] {
+  if (!rawPlayUrl) return [];
+  
+  // 1. 先用全域通用正則抓所有 m3u8 網址
+  const directMatches = rawPlayUrl.match(/https?:\/\/[^"'\s$#]+?\.m3u8/g);
+  if (directMatches && directMatches.length > 0) {
+    return Array.from(new Set(directMatches));
+  }
+
+  // 2. 備援分割解析（標準蘋果 CMS 格式：名稱$網址#名稱$網址）   const episodes: string[] = [];   const groups = rawPlayUrl.split('$$$');
+  for (const group of groups) {
+    const list = group.split('#');
+    for (const item of list) {
+      const parts = item.split('$');
+      const url = parts.length > 1 ? parts[1].trim() : parts[0].trim();
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        episodes.push(url);
+      }
+    }
+    if (episodes.length > 0) break; // 優先採用第一組有效播放線路
+  }
+  return Array.from(new Set(episodes));
+}
+
 export async function searchFromApi(
   apiSite: ApiSite,
   query: string
@@ -55,24 +80,7 @@ export async function searchFromApi(
     }
 
     return data.list.map((item: ApiSearchItem) => {
-      let episodes: string[] = [];
-
-      if (item.vod_play_url) {
-        const m3u8Regex = /\$(https?:\/\/[^"'\s]+?\.m3u8)/g;
-        const vod_play_url_array = item.vod_play_url.split('$$$');
-        vod_play_url_array.forEach((url: string) => {
-          const matches = url.match(m3u8Regex) || [];
-          if (matches.length > episodes.length) {
-            episodes = matches;
-          }
-        });
-      }
-
-      episodes = Array.from(new Set(episodes)).map((link: string) => {
-        link = link.substring(1);
-        const parenIndex = link.indexOf('(');
-        return parenIndex > 0 ? link.substring(0, parenIndex) : link;
-      });
+      const episodes = parseM3u8Links(item.vod_play_url);
 
       return {
         id: item.vod_id.toString(),
@@ -95,13 +103,10 @@ export async function searchFromApi(
   }
 }
 
-const M3U8_PATTERN = /(https?:\/\/[^"'\s]+?\.m3u8)/g;
-
 export async function getDetailFromApi(
   apiSite: ApiSite,
   id: string
 ): Promise<SearchResult> {
-  // 一律走標準的 JSON API 獲取資料，不走容易失效的 HTML 爬蟲
   const detailUrl = `${apiSite.api}${API_CONFIG.detail.path}${id}`;
 
   const controller = new AbortController();
@@ -130,28 +135,10 @@ export async function getDetailFromApi(
   }
 
   const videoDetail = data.list[0];
-  let episodes: string[] = [];
-
-  if (videoDetail.vod_play_url) {
-    const playSources = videoDetail.vod_play_url.split('$$$');
-    if (playSources.length > 0) {
-      const mainSource = playSources[0];
-      const episodeList = mainSource.split('#');
-      episodes = episodeList
-        .map((ep: string) => {
-          const parts = ep.split('$');
-          return parts.length > 1 ? parts[1] : parts[0];
-        })
-        .filter(
-          (url: string) =>
-            url && (url.startsWith('http://') || url.startsWith('https://'))
-        );
-    }
-  }
+  let episodes = parseM3u8Links(videoDetail.vod_play_url);
 
   if (episodes.length === 0 && videoDetail.vod_content) {
-    const matches = videoDetail.vod_content.match(M3U8_PATTERN) || [];
-    episodes = matches.map((link: string) => link.replace(/^\$/, ''));
+    episodes = parseM3u8Links(videoDetail.vod_content);
   }
 
   return {
