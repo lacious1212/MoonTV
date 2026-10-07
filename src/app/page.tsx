@@ -23,6 +23,11 @@ import ScrollableRow from '@/components/ScrollableRow';
 import { useSite } from '@/components/SiteProvider';
 import VideoCard from '@/components/VideoCard';
 
+const formatDoubanUrl = (url?: string) => {
+  if (!url) return '';
+  return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
+};
+
 function HomeClient() {
   const [activeTab, setActiveTab] = useState<'home' | 'favorites'>('home');
   const [hotMovies, setHotMovies] = useState<DoubanItem[]>([]);
@@ -111,7 +116,7 @@ function HomeClient() {
           source,
           title: fav.title,
           year: fav.year,
-          poster: fav.cover,
+          poster: formatDoubanUrl(fav.cover),
           episodes: fav.total_episodes,
           source_name: fav.source_name,
           currentEpisode,
@@ -244,7 +249,7 @@ function HomeClient() {
                           <VideoCard
                             from='douban'
                             title={movie.title}
-                            poster={movie.poster}
+                            poster={formatDoubanUrl(movie.poster)}
                             douban_id={movie.id}
                             rate={movie.rate}
                             year={movie.year}
@@ -292,7 +297,7 @@ function HomeClient() {
                           <VideoCard
                             from='douban'
                             title={show.title}
-                            poster={show.poster}
+                            poster={formatDoubanUrl(show.poster)}
                             douban_id={show.id}
                             rate={show.rate}
                             year={show.year}
