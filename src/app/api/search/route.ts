@@ -6,30 +6,20 @@ import { SearchResult } from '@/lib/types';
 
 export const runtime = 'edge';
 
-// 常用影視繁簡對照表（涵蓋高頻字與混合輸入）
-const T2S_MAP: Record<string, string> = {
-  '開': '开', '端': '端', '難': '难', '哄': '哄', '無': '无', '間': '间',
-  '春': '春', '晴': '晴', '朗': '朗', '愛': '爱', '寶': '宝', '貝': '贝',
-  '國': '国', '華': '华', '麗': '丽', '劇': '剧', '集': '集', '動': '动',
-  '漫': '漫', '電': '电', '影': '影', '視': '视', '頻': '频', '樂': '乐',
-  '歡': '欢', '喜': '喜', '傳': '传', '奇': '奇', '說': '说', '話': '话',
-  '戰': '战', '爭': '争', '鬥': '斗', '門': '门', '關': '关', '連': '连',
-  '續': '续', '風': '风', '雲': '云', '龍': '龙', '鳳': '凤', '飛': '飞',
-  '天': '天', '地': '地', '長': '长', '生': '生', '夢': '梦', '見': '见',
-  '機': '机', '器': '器', '變': '变', '形': '形', '金': '金', '剛': '刚',
-  '復': '复', '仇': '仇', '聯': '联', '盟': '盟', '俠': '侠', '義': '义',
-  '神': '神', '話': '话', '仙': '仙', '劍': '剑', '問': '问', '道': '道',
-  '絕': '绝', '代': '代', '雙': '双', '驕': '骄', '倚': '倚', '屠': '屠',
-  '記': '记', '錄': '录', '尋': '寻', '秦': '秦', '漢': '汉', '唐': '唐',
-  '宋': '宋', '明': '明', '清': '清', '宮': '宫', '鎖': '锁', '心': '心',
-  '玉': '玉', '珠': '珠', '環': '环', '傳': '传', '說': '说', '書': '书',
-};
+// 影視常見繁簡映射庫（成對字符，保證零重複、支援簡繁交替）
+const T_CHARS =
+  '開難無間春晴朗愛寶貝國華麗劇集動漫電影視頻樂歡喜傳奇說話戰爭鬥門關連續風雲龍鳳飛天地長生夢見機器變形金剛復仇聯盟俠義神仙劍問道絕代雙驕倚屠記錄尋秦漢唐宋明清宮鎖心玉珠環書體熱門點評推薦網衛視綜藝科幻懸疑愛情喜劇動作恐怖古裝武俠歷史冒險罪案紀錄片';
+const S_CHARS =
+  '开难无间春晴朗爱宝贝国华丽剧集动漫电影视频乐欢喜传奇说话战争斗门关连续风云龙凤飞天地长生梦见机器变形金刚复仇联盟侠义神仙剑问道绝代双骄倚屠记录寻秦汉唐宋明清宫锁心玉珠环书体热门点评推荐网卫视综艺科幻悬疑爱情喜剧动作恐怖古装武侠历史冒险罪案纪录片';
 
-// 逐字轉簡體函式（即使簡繁交替也能逐一替換）
+// 逐字轉換函式：若字在繁體庫中就轉為簡體，否則保留原字
 function convertToSimplified(text: string): string {
   return text
     .split('')
-    .map((char) => T2S_MAP[char] || char)
+    .map((char) => {
+      const idx = T_CHARS.indexOf(char);
+      return idx !== -1 ? S_CHARS[idx] : char;
+    })
     .join('');
 }
 
@@ -52,7 +42,7 @@ export async function GET(request: Request) {
   const trimmedQuery = rawQuery.trim();
   const simplifiedQuery = convertToSimplified(trimmedQuery);
 
-  // 整理要搜尋的關鍵字清單（若轉簡後不同，則兩個都搜）
+  // 同時搜尋「原始輸入」與「轉簡體後」，自動去重
   const queriesToSearch = Array.from(
     new Set([trimmedQuery, simplifiedQuery].filter(Boolean))
   );
@@ -60,7 +50,6 @@ export async function GET(request: Request) {
   const apiSites = await getAvailableApiSites();
 
   try {
-    // 同時對所有站點以原始及轉簡後的關鍵字檢索
     const searchTasks = queriesToSearch.flatMap((q) =>
       apiSites.map((site) => searchFromApi(site, q))
     );
@@ -68,7 +57,7 @@ export async function GET(request: Request) {
     const rawResults = await Promise.all(searchTasks);
     const flattenedResults = rawResults.flat();
 
-    // 依照 source + id 進行去重
+    // 依據 source + id 去重
     const seen = new Set<string>();
     const deduplicatedResults: SearchResult[] = [];
 
