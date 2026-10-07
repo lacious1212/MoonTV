@@ -15,7 +15,8 @@ const nextConfig = {
       { protocol: 'https', hostname: 'img2.doubanio.com' },
       { protocol: 'https', hostname: 'img3.doubanio.com' },
       { protocol: 'https', hostname: 'img9.doubanio.com' },
-      { protocol: 'https', hostname: 'images.weserv.nl' }
+      { protocol: 'https', hostname: 'images.weserv.nl' },
+      { protocol: 'https', hostname: 'douban-proxy.ludaoxous.workers.dev' }
     ],
     // 讓 Next.js 本地伺服器幫忙緩存與轉發圖片，直接避開瀏覽器直連被擋的問題
     unoptimized: false,
