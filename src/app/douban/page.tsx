@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 
 import { getDoubanCategories } from '@/lib/douban.client';
@@ -14,6 +14,7 @@ import PageLayout from '@/components/PageLayout';
 import VideoCard from '@/components/VideoCard';
 
 function DoubanPageClient() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [doubanData, setDoubanData] = useState<DoubanItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,61 +28,92 @@ function DoubanPageClient() {
 
   const type = searchParams.get('type') || 'movie';
 
-  // 选择器状态
+  // 從 URL 或 sessionStorage 讀取記憶狀態
+  const getInitialValue = (key: string, fallback: string) => {
+    const urlVal = searchParams.get(key);
+    if (urlVal) return urlVal;
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem(`douban_${type}_${key}`);
+      if (saved) return saved;
+    }
+    return fallback;
+  };
+
   const [primarySelection, setPrimarySelection] = useState<string>(() => {
-    return type === 'movie' ? '热门' : '';
-  });
-  const [secondarySelection, setSecondarySelection] = useState<string>(() => {
-    if (type === 'movie') return '全部';
-    if (type === 'tv') return 'tv';
-    if (type === 'show') return 'show';
-    return '全部';
+    return getInitialValue('primary', type === 'movie' ? '热门' : '');
   });
 
-  // 新增：题材与年份状态
-  const [genreSelection, setGenreSelection] = useState<string>('全部');
-  const [yearSelection, setYearSelection] = useState<string>('全部');
+  const [secondarySelection, setSecondarySelection] = useState<string>(() => {
+    const defaultSec = type === 'movie' ? '全部' : type === 'tv' ? 'tv' : type === 'show' ? 'show' : '全部';
+    return getInitialValue('secondary', defaultSec);
+  });
+
+  const [genreSelection, setGenreSelection] = useState<string>(() => {
+    return getInitialValue('genre', '全部');
+  });
+
+  const [yearSelection, setYearSelection] = useState<string>(() => {
+    return getInitialValue('year', '全部');
+  });
+
+  // 更新記憶並同步至 URL（不觸發頁面跳轉）
+  const updateMemoryAndUrl = (updates: Record<string, string>) => {
+    const newParams = new URLSearchParams(window.location.search);
+    newParams.set('type', type);
+
+    const merged = {
+      primary: updates.primary !== undefined ? updates.primary : primarySelection,
+      secondary: updates.secondary !== undefined ? updates.secondary : secondarySelection,
+      genre: updates.genre !== undefined ? updates.genre : genreSelection,
+      year: updates.year !== undefined ? updates.year : yearSelection,
+    };
+
+    Object.entries(merged).forEach(([k, v]) => {
+      if (v && v !== '全部' && v !== 'tv' && v !== 'show') {
+        newParams.set(k, v);
+      } else {
+        newParams.delete(k);
+      }
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`douban_${type}_${k}`, v);
+      }
+    });
+
+    const newUrl = `${window.location.pathname}?${newParams.toString()}`;
+    window.history.replaceState({ ...window.history.state, as: newUrl, url: newUrl }, '', newUrl);
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setSelectorsReady(true);
     }, 50);
-
     return () => clearTimeout(timer);
   }, []);
 
+  // 當頂層 tab 類型（電影 / 劇集 / 綜藝）切換時重新讀取該分頁的記憶狀態
   useEffect(() => {
     setSelectorsReady(false);
     setLoading(true);
-  }, [type]);
 
-  useEffect(() => {
-    if (type === 'movie') {
-      setPrimarySelection('热门');
-      setSecondarySelection('全部');
-    } else if (type === 'tv') {
-      setPrimarySelection('');
-      setSecondarySelection('tv');
-    } else if (type === 'show') {
-      setPrimarySelection('');
-      setSecondarySelection('show');
-    } else {
-      setPrimarySelection('');
-      setSecondarySelection('全部');
-    }
-    setGenreSelection('全部');
-    setYearSelection('全部');
+    const defaultSec = type === 'movie' ? '全部' : type === 'tv' ? 'tv' : type === 'show' ? 'show' : '全部';
+    const initPrimary = getInitialValue('primary', type === 'movie' ? '热门' : '');
+    const initSec = getInitialValue('secondary', defaultSec);
+    const initGenre = getInitialValue('genre', '全部');
+    const initYear = getInitialValue('year', '全部');
+
+    setPrimarySelection(initPrimary);
+    setSecondarySelection(initSec);
+    setGenreSelection(initGenre);
+    setYearSelection(initYear);
 
     const timer = setTimeout(() => {
       setSelectorsReady(true);
     }, 50);
-
     return () => clearTimeout(timer);
   }, [type]);
 
   const skeletonData = Array.from({ length: 25 }, (_, index) => index);
 
-  // 组装 API 请求参数
   const getRequestParams = useCallback(
     (pageStart: number) => {
       const baseParams: any = {
@@ -134,9 +166,7 @@ function DoubanPageClient() {
   }, [type, primarySelection, secondarySelection, genreSelection, yearSelection, getRequestParams]);
 
   useEffect(() => {
-    if (!selectorsReady) {
-      return;
-    }
+    if (!selectorsReady) return;
 
     setDoubanData([]);
     setCurrentPage(0);
@@ -171,10 +201,7 @@ function DoubanPageClient() {
       const fetchMoreData = async () => {
         try {
           setIsLoadingMore(true);
-
-          const data = await getDoubanCategories(
-            getRequestParams(currentPage * 25)
-          );
+          const data = await getDoubanCategories(getRequestParams(currentPage * 25));
 
           if (data.code === 200) {
             setDoubanData((prev) => [...prev, ...data.list]);
@@ -194,13 +221,8 @@ function DoubanPageClient() {
   }, [currentPage, type, primarySelection, secondarySelection, genreSelection, yearSelection]);
 
   useEffect(() => {
-    if (!hasMore || isLoadingMore || loading) {
-      return;
-    }
-
-    if (!loadingRef.current) {
-      return;
-    }
+    if (!hasMore || isLoadingMore || loading) return;
+    if (!loadingRef.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -226,6 +248,7 @@ function DoubanPageClient() {
       if (value !== primarySelection) {
         setLoading(true);
         setPrimarySelection(value);
+        updateMemoryAndUrl({ primary: value });
       }
     },
     [primarySelection]
@@ -236,6 +259,7 @@ function DoubanPageClient() {
       if (value !== secondarySelection) {
         setLoading(true);
         setSecondarySelection(value);
+        updateMemoryAndUrl({ secondary: value });
       }
     },
     [secondarySelection]
@@ -246,6 +270,7 @@ function DoubanPageClient() {
       if (value !== genreSelection) {
         setLoading(true);
         setGenreSelection(value);
+        updateMemoryAndUrl({ genre: value });
       }
     },
     [genreSelection]
@@ -256,6 +281,7 @@ function DoubanPageClient() {
       if (value !== yearSelection) {
         setLoading(true);
         setYearSelection(value);
+        updateMemoryAndUrl({ year: value });
       }
     },
     [yearSelection]
@@ -266,11 +292,7 @@ function DoubanPageClient() {
   };
 
   const getActivePath = () => {
-    const params = new URLSearchParams();
-    if (type) params.set('type', type);
-
-    const queryString = params.toString();
-    return `/douban${queryString ? `?${queryString}` : ''}`;
+    return `/douban?type=${type}`;
   };
 
   return (
@@ -324,9 +346,7 @@ function DoubanPageClient() {
             <div
               ref={(el) => {
                 if (el && el.offsetParent !== null) {
-                  (
-                    loadingRef as React.MutableRefObject<HTMLDivElement | null>
-                  ).current = el;
+                  (loadingRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
                 }
               }}
               className='flex justify-center mt-12 py-8'
