@@ -1,9 +1,11 @@
 import { DoubanItem, DoubanResult } from './types';
 
-interface DoubanCategoriesParams {
+export interface DoubanCategoriesParams {
   kind: 'tv' | 'movie';
   category: string;
   type: string;
+  genres?: string;
+  year?: string;
   pageLimit?: number;
   pageStart?: number;
 }
@@ -29,17 +31,13 @@ function formatDoubanImageUrl(url?: string): string {
   return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
 }
 
-/**
- * 带超时的 fetch 请求
- */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10秒超时
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-  // 检查是否使用代理
   const proxyUrl = getDoubanProxyUrl();
   const finalUrl = proxyUrl ? `${proxyUrl}${encodeURIComponent(url)}` : url;
 
@@ -65,61 +63,42 @@ async function fetchWithTimeout(
   }
 }
 
-/**
- * 获取豆瓣代理 URL 设置
- */
 export function getDoubanProxyUrl(): string | null {
   if (typeof window === 'undefined') return null;
-
   const doubanProxyUrl = localStorage.getItem('doubanProxyUrl');
   return doubanProxyUrl && doubanProxyUrl.trim() ? doubanProxyUrl.trim() : null;
 }
 
-/**
- * 检查是否应该使用客户端获取豆瓣数据
- */
 export function shouldUseDoubanClient(): boolean {
   return getDoubanProxyUrl() !== null;
 }
 
-/**
- * 浏览器端豆瓣分类数据获取函数
- */
 export async function fetchDoubanCategories(
   params: DoubanCategoriesParams
 ): Promise<DoubanResult> {
-  const { kind, category, type, pageLimit = 20, pageStart = 0 } = params;
+  const { kind, category, type, genres, year, pageLimit = 20, pageStart = 0 } = params;
 
-  // 验证参数
   if (!['tv', 'movie'].includes(kind)) {
     throw new Error('kind 参数必须是 tv 或 movie');
   }
 
-  if (!category || !type) {
-    throw new Error('category 和 type 参数不能为空');
+  let target = `https://m.douban.com/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`;
+  if (genres && genres !== '全部') {
+    target += `&genres=${encodeURIComponent(genres)}`;
   }
-
-  if (pageLimit < 1 || pageLimit > 100) {
-    throw new Error('pageLimit 必须在 1-100 之间');
+  if (year && year !== '全部') {
+    target += `&year_range=${encodeURIComponent(`${year},${year}`)}`;
   }
-
-  if (pageStart < 0) {
-    throw new Error('pageStart 不能小于 0');
-  }
-
-  const target = `https://m.douban.com/rexxar/api/v2/subject/recent_hot/${kind}?start=${pageStart}&limit=${pageLimit}&category=${category}&type=${type}`;
 
   try {
     const response = await fetchWithTimeout(target);
-
     if (!response.ok) {
       throw new Error(`HTTP error! Status: ${response.status}`);
     }
 
     const doubanData: DoubanCategoryApiResponse = await response.json();
 
-    // 转换数据格式
-    const list: DoubanItem[] = doubanData.items.map((item) => ({
+    const list: DoubanItem[] = (doubanData.items || []).map((item) => ({
       id: item.id,
       title: item.title,
       poster: formatDoubanImageUrl(item.pic?.normal || item.pic?.large || ''),
@@ -137,22 +116,23 @@ export async function fetchDoubanCategories(
   }
 }
 
-/**
- * 统一的豆瓣分类数据获取函数，根据代理设置选择使用服务端 API 或客户端代理获取
- */
 export async function getDoubanCategories(
   params: DoubanCategoriesParams
 ): Promise<DoubanResult> {
   if (shouldUseDoubanClient()) {
-    // 使用客户端代理获取（当设置了代理 URL 时）
     return fetchDoubanCategories(params);
   } else {
-    // 使用服务端 API（当没有设置代理 URL 时）
-    const { kind, category, type, pageLimit = 20, pageStart = 0 } = params;
-    const response = await fetch(
-      `/api/douban/categories?kind=${kind}&category=${category}&type=${type}&limit=${pageLimit}&start=${pageStart}`
-    );
+    const { kind, category, type, genres, year, pageLimit = 20, pageStart = 0 } = params;
+    let url = `/api/douban/categories?kind=${kind}&category=${encodeURIComponent(category)}&type=${encodeURIComponent(type)}&limit=${pageLimit}&start=${pageStart}`;
+    
+    if (genres && genres !== '全部') {
+      url += `&genres=${encodeURIComponent(genres)}`;
+    }
+    if (year && year !== '全部') {
+      url += `&year=${encodeURIComponent(year)}`;
+    }
 
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error('获取豆瓣分类数据失败');
     }
