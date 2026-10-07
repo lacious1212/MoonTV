@@ -4,32 +4,58 @@ import { getStorage } from '@/lib/db';
 import { AdminConfig } from './admin.types';
 
 // 配置穩定的開源影視採集站點
+// 請直接替換 src/lib/config.ts 裡的 runtimeConfig
 const runtimeConfig = {
   cache_time: 7200,
   api_site: {
+    // 1. 綜合龍頭大站（劇集更新最快、連線極穩）
     ffm3u8: {
       key: 'ffm3u8',
       api: 'https://cj.ffzyapi.com/api.php/provide/vod/',
       name: '非凡資源',
       detail: 'https://cj.ffzyapi.com/api.php/provide/vod/',
     },
+    // 2. 綜合主力（備援覆蓋極高）
     lzm3u8: {
       key: 'lzm3u8',
       api: 'https://cj.lziapi.com/api.php/provide/vod/',
       name: '量子資源',
       detail: 'https://cj.lziapi.com/api.php/provide/vod/',
     },
+    // 3. 院線與經典電影庫存完整
+    bfm3u8: {
+      key: 'bfm3u8',
+      api: 'https://bfzyapi.com/api.php/provide/vod/',
+      name: '暴風資源',
+      detail: 'https://bfzyapi.com/api.php/provide/vod/',
+    },
+    // 4. 老片、綜藝與長壽連續劇齊全
+    wjm3u8: {
+      key: 'wjm3u8',
+      api: 'https://api.wujinapi.me/api.php/provide/vod/',
+      name: '無盡資源',
+      detail: 'https://api.wujinapi.me/api.php/provide/vod/',
+    },
+    // 5. 補漏專用（常有其他站未收錄的小眾資源）
+    snm3u8: {
+      key: 'snm3u8',
+      api: 'https://suoniapi.com/api.php/provide/vod/',
+      name: '索尼資源',
+      detail: 'https://suoniapi.com/api.php/provide/vod/',
+    },
+    // 6. 短劇、網劇與熱播陸劇專門
     mdm3u8: {
       key: 'mdm3u8',
       api: 'https://caiji.moduapi.cc/api.php/provide/vod/',
       name: '魔都資源',
       detail: 'https://caiji.moduapi.cc/api.php/provide/vod/',
     },
-    snm3u8: {
-      key: 'snm3u8',
-      api: 'https://suoniapi.com/api.php/provide/vod/',
-      name: '索尼資源',
-      detail: 'https://suoniapi.com/api.php/provide/vod/',
+    // 7. 動漫與海外新番更新快
+    ikm3u8: {
+      key: 'ikm3u8',
+      api: 'https://ikunzyapi.com/api.php/provide/vod/',
+      name: 'iKun資源',
+      detail: 'https://ikunzyapi.com/api.php/provide/vod/',
     },
   },
 };
