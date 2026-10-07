@@ -101,14 +101,22 @@ export async function GET(request: Request) {
     // 调用豆瓣 API
     const doubanData = await fetchDoubanData(target);
 
-    // 转换数据格式
-    const list: DoubanItem[] = doubanData.items.map((item) => ({
-      id: item.id,
-      title: item.title,
-      poster: item.pic?.normal || item.pic?.large || '',
-      rate: item.rating?.value ? item.rating.value.toFixed(1) : '',
-      year: item.card_subtitle?.match(/(\d{4})/)?.[1] || '',
-    }));
+    // 转换数据格式并直接接入 Cloudflare Worker 代理
+    const list: DoubanItem[] = doubanData.items.map((item) => {
+      const rawPoster = item.pic?.normal || item.pic?.large || '';
+      const proxiedPoster = rawPoster.replace(
+        /https?:\/\/[a-z0-9]+\.doubanio\.com/g,
+        'https://douban-proxy.ludaoxous.workers.dev'
+      );
+
+      return {
+        id: item.id,
+        title: item.title,
+        poster: proxiedPoster,
+        rate: item.rating?.value ? item.rating.value.toFixed(1) : '',
+        year: item.card_subtitle?.match(/(\d{4})/)?.[1] || '',
+      };
+    });
 
     const response: DoubanResult = {
       code: 200,
