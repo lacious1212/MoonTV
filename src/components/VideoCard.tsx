@@ -108,6 +108,15 @@ export default function VideoCard({
       : 'tv'
     : type;
 
+  // 全面強制代理豆瓣圖片
+  const displayPoster = useMemo(() => {
+    const raw = processImageUrl(actualPoster) || actualPoster || '';
+    return raw.replace(
+      /https?:\/\/[a-z0-9]+\.doubanio\.com/g,
+      'https://douban-proxy.ludaoxous.workers.dev'
+    );
+  }, [actualPoster]);
+
   // 获取收藏状态
   useEffect(() => {
     if (from === 'douban' || !actualSource || !actualId) return;
@@ -267,12 +276,12 @@ export default function VideoCard({
     >
       {/* 海报容器 */}
       <div className='relative aspect-[2/3] overflow-hidden rounded-lg bg-neutral-800/50'>
-        {/* 💡 終極修正：徹底閹割 Next.js 壞掉的 Image 優化引擎，換回原始 img 標籤直出，秒刷海報！ */}
         <img
-          src={processImageUrl(actualPoster)}
+          src={displayPoster}
           alt={actualTitle}
           className='w-full h-full object-cover rounded-lg'
           loading="eager"
+          referrerPolicy="no-referrer"
         />
 
         {/* 悬浮遮罩 */}
@@ -328,7 +337,6 @@ export default function VideoCard({
           </div>
         )}
 
-        {/* 豆瓣链接 */}
         {config.showDoubanLink && actualDoubanId && (
           <a
             href={`https://movie.douban.com/subject/${actualDoubanId}`}
@@ -360,7 +368,6 @@ export default function VideoCard({
           <span className='block text-sm font-semibold truncate text-gray-900 dark:text-gray-100 transition-colors duration-300 ease-in-out group-hover:text-green-600 dark:group-hover:text-green-400 peer'>
             {actualTitle}
           </span>
-          {/* 自定义 tooltip */}
           <div className='absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1 bg-gray-800 text-white text-xs rounded-md shadow-lg opacity-0 invisible peer-hover:opacity-100 peer-hover:visible transition-all duration-200 ease-out delay-100 whitespace-nowrap pointer-events-none'>
             {actualTitle}
             <div className='absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800'></div>
