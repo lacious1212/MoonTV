@@ -1,21 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any,no-console */
 // 💡 終極加速完全體：捨棄塞車的 weserv，換上亞洲區秒刷的 UC 圖片直連代理，讓海報瞬間大復活！
 
+/* eslint-disable @typescript-eslint/no-explicit-any,no-console */
+
 export function getDoubanImagePath(url: string | null | undefined): string {
   if (!url) return '';
-  // 🚀 換上 UC 大神通道：速度極快，且完美破解豆瓣 418 防盜鏈
-  return `https://image.uc.cn/s/wemedia/pic/` + url.replace(/^https?:\/\//, '');
+  return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
 }
 
 export function processImageUrl(url: string | null | undefined): string {
   if (!url) return '';
-  return `https://image.uc.cn/s/wemedia/pic/` + url.replace(/^https?:\/\//, '');
+  return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
 }
 
 export function getDoubanImageProxyConfig() {
   return {
     proxyType: 'custom',
-    proxyUrl: 'https://image.uc.cn/s/wemedia/pic/',
+    proxyUrl: 'https://douban-proxy.ludaoxous.workers.dev/',
   };
 }
 
