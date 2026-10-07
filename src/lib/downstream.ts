@@ -15,6 +15,12 @@ interface ApiSearchItem {
   type_name?: string;
 }
 
+// 輔助函式：將豆瓣圖片替換為專屬 Worker 代理
+function formatPosterUrl(url?: string): string {
+  if (!url) return '';
+  return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
+}
+
 export async function searchFromApi(
   apiSite: ApiSite,
   query: string
@@ -56,8 +62,7 @@ export async function searchFromApi(
       // 使用正则表达式从 vod_play_url 提取 m3u8 链接
       if (item.vod_play_url) {
         const m3u8Regex = /\$(https?:\/\/[^"'\s]+?\.m3u8)/g;
-        // 先用 $$$ 分割
-        const vod_play_url_array = item.vod_play_url.split('$$$');
+        // 先用 $$$ 分割         const vod_play_url_array = item.vod_play_url.split('$$$');
         // 对每个分片做匹配，取匹配到最多的作为结果
         vod_play_url_array.forEach((url: string) => {
           const matches = url.match(m3u8Regex) || [];
@@ -76,7 +81,7 @@ export async function searchFromApi(
       return {
         id: item.vod_id.toString(),
         title: item.vod_name.trim().replace(/\s+/g, ' '),
-        poster: item.vod_pic,
+        poster: formatPosterUrl(item.vod_pic),
         episodes,
         source: apiSite.key,
         source_name: apiName,
@@ -149,7 +154,7 @@ export async function searchFromApi(
               return {
                 id: item.vod_id.toString(),
                 title: item.vod_name.trim().replace(/\s+/g, ' '),
-                poster: item.vod_pic,
+                poster: formatPosterUrl(item.vod_pic),
                 episodes,
                 source: apiSite.key,
                 source_name: apiName,
@@ -255,7 +260,7 @@ export async function getDetailFromApi(
   return {
     id: id.toString(),
     title: videoDetail.vod_name,
-    poster: videoDetail.vod_pic,
+    poster: formatPosterUrl(videoDetail.vod_pic),
     episodes,
     source: apiSite.key,
     source_name: apiSite.name,
@@ -331,8 +336,8 @@ async function handleSpecialSourceDetail(
   return {
     id,
     title: titleText,
-    poster: coverUrl,
-    episodes: matches,
+    poster: formatPosterUrl(coverUrl),
+    episodes,
     source: apiSite.key,
     source_name: apiSite.name,
     class: '',
