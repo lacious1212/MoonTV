@@ -319,7 +319,7 @@ async function handleSpecialSourceDetail(
     id,
     title: titleText,
     poster: formatPosterUrl(coverUrl),
-    episodes,
+    episodes: matches,
     source: apiSite.key,
     source_name: apiSite.name,
     class: '',
