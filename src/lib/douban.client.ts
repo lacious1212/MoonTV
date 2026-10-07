@@ -24,6 +24,11 @@ interface DoubanCategoryApiResponse {
   }>;
 }
 
+function formatDoubanImageUrl(url?: string): string {
+  if (!url) return '';
+  return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
+}
+
 /**
  * 带超时的 fetch 请求
  */
@@ -117,7 +122,7 @@ export async function fetchDoubanCategories(
     const list: DoubanItem[] = doubanData.items.map((item) => ({
       id: item.id,
       title: item.title,
-      poster: item.pic?.normal || item.pic?.large || '',
+      poster: formatDoubanImageUrl(item.pic?.normal || item.pic?.large || ''),
       rate: item.rating?.value ? item.rating.value.toFixed(1) : '',
       year: item.card_subtitle?.match(/(\d{4})/)?.[1] || '',
     }));
@@ -152,6 +157,14 @@ export async function getDoubanCategories(
       throw new Error('获取豆瓣分类数据失败');
     }
 
-    return response.json();
+    const result: DoubanResult = await response.json();
+    if (result && Array.isArray(result.list)) {
+      result.list = result.list.map((item) => ({
+        ...item,
+        poster: formatDoubanImageUrl(item.poster),
+      }));
+    }
+
+    return result;
   }
 }
