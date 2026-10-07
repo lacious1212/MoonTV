@@ -20,17 +20,10 @@ function formatPosterUrl(url?: string): string {
   return url.replace(/https?:\/\/[a-z0-9]+\.doubanio\.com/g, 'https://douban-proxy.ludaoxous.workers.dev');
 }
 
-// 萬能解析 m3u8 連結函式（相容 $、# 或純 URL）
 function parseM3u8Links(rawPlayUrl?: string): string[] {
   if (!rawPlayUrl) return [];
-  
-  // 1. 先用全域通用正則抓所有 m3u8 網址
-  const directMatches = rawPlayUrl.match(/https?:\/\/[^"'\s$#]+?\.m3u8/g);
-  if (directMatches && directMatches.length > 0) {
-    return Array.from(new Set(directMatches));
-  }
 
-  // 2. 備援分割解析（標準蘋果 CMS 格式：名稱$網址#名稱$網址）   const episodes: string[] = [];   const groups = rawPlayUrl.split('$$$');
+  const directMatches = rawPlayUrl.match(/https?:\/\/[^"'\s$#]+?\.m3u8/g);   if (directMatches && directMatches.length > 0) {     return Array.from(new Set(directMatches));   }    const episodes: string[] = [];   const groups = rawPlayUrl.split('$$$');
   for (const group of groups) {
     const list = group.split('#');
     for (const item of list) {
@@ -40,7 +33,7 @@ function parseM3u8Links(rawPlayUrl?: string): string[] {
         episodes.push(url);
       }
     }
-    if (episodes.length > 0) break; // 優先採用第一組有效播放線路
+    if (episodes.length > 0) break;
   }
   return Array.from(new Set(episodes));
 }
